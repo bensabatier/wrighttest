@@ -1,13 +1,26 @@
-import { FastifyInstance } from 'fastify';
+import { FastifyInstance, type FastifyReply } from 'fastify';
 import { z } from 'zod';
 import prisma from '../prisma';
+import type { Step } from '../types/step';
 import { exportToSpec } from '../services/exporter';
+import { buildPlaywrightProjectZip } from '../services/project-export';
 import { parsePlaywrightSpec } from '../services/importer';
 
 const ImportSchema = z.object({
   code: z.string().min(1),
   name: z.string().optional()
 });
+
+const ExportProjectSchema = z.object({
+  envId: z.string().optional(),
+  useEnvVars: z.boolean().optional()
+});
+
+type ExportProjectRoute = {
+  Params: { id: string };
+  Body: { envId?: string; useEnvVars?: boolean };
+  Querystring: { envId?: string; useEnvVars?: string };
+};
 
 function sanitizeFilename(name: string) {
   return name
@@ -46,6 +59,58 @@ export async function exportRoutes(fastify: FastifyInstance) {
       return reply.send(code);
     }
   );
+
+  const exportProjectHandler = async (
+    req: {
+      params: { id: string };
+      body?: { envId?: string; useEnvVars?: boolean };
+      query: { envId?: string; useEnvVars?: string };
+    },
+    reply: FastifyReply
+  ) => {
+    const payload = {
+      envId: req.body?.envId ?? req.query.envId,
+      useEnvVars:
+        req.body?.useEnvVars ??
+        (req.query.useEnvVars === undefined ? undefined : req.query.useEnvVars === 'true')
+    };
+
+    const body = ExportProjectSchema.safeParse(payload);
+    if (!body.success) {
+      return reply.status(400).send({ error: body.error.flatten() });
+    }
+
+    const test = await prisma.test.findUnique({
+      where: { id: req.params.id }
+    });
+
+    if (!test) {
+      return reply.status(404).send({ error: 'Test not found' });
+    }
+
+    let variables: Record<string, string> = {};
+    if (body.data.envId) {
+      const environment = await prisma.environment.findUnique({
+        where: { id: body.data.envId }
+      });
+      variables = (environment?.variables ?? {}) as Record<string, string>;
+    }
+
+    const { buffer, filename } = await buildPlaywrightProjectZip({
+      testName: test.name,
+      testUrl: test.url,
+      steps: test.steps as unknown as Step[],
+      variables,
+      useEnvVars: body.data.useEnvVars ?? false
+    });
+
+    reply.header('Content-Type', 'application/zip');
+    reply.header('Content-Disposition', `attachment; filename="${filename}"`);
+    return reply.send(buffer);
+  };
+
+  fastify.post<ExportProjectRoute>('/tests/:id/export-project', exportProjectHandler);
+  fastify.post<ExportProjectRoute>('/checks/:id/export-project', exportProjectHandler);
 
   fastify.post<{ Params: { projectId: string } }>('/projects/:projectId/import', async (req, reply) => {
     const body = ImportSchema.safeParse(req.body);

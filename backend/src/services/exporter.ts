@@ -139,6 +139,7 @@ function stepToCode(step: Step, variables: Record<string, string>, useEnvVars: b
 
 export function exportToSpec(steps: Step[], opts: ExportOptions): string {
   const { testName, variables = {}, useEnvVars = false } = opts;
+  const hasAssertions = steps.some((step) => step.action.startsWith('assert'));
   const usesTemplates = useEnvVars && steps.some((step) => JSON.stringify(step).includes('{{'));
   const needsEscapeRegExpHelper = useEnvVars && steps.some((step) => step.action === 'assertURL' || step.action === 'assertTitle');
 
@@ -160,7 +161,9 @@ export function exportToSpec(steps: Step[], opts: ExportOptions): string {
     : '';
 
   return [
-    "import { test, expect } from '@playwright/test';",
+    hasAssertions
+      ? "import { test, expect } from '@playwright/test';"
+      : "import { test } from '@playwright/test';",
     helper,
     `test(${JSON.stringify(testName)}, async ({ page }) => {`,
     lines,

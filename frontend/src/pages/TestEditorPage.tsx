@@ -1,8 +1,9 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Alert, Breadcrumb, Button, Card, Col, Form, Input, Layout, Modal, Radio, Row, Select, Space, Tag, Typography, message, notification } from 'antd';
-import { DownloadOutlined, PlayCircleOutlined, StopOutlined, VideoCameraOutlined, WarningOutlined } from '@ant-design/icons';
+import { Alert, Breadcrumb, Button, Card, Col, Dropdown, Form, Input, Layout, Modal, Radio, Row, Select, Space, Tag, Typography, message, notification } from 'antd';
+import type { MenuProps } from 'antd';
+import { DownOutlined, DownloadOutlined, PlayCircleOutlined, StopOutlined, VideoCameraOutlined, WarningOutlined } from '@ant-design/icons';
 import { useNavigate, useParams, Link } from 'react-router-dom';
-import { createTest, getDevices, getEnvironments, getProject, getTest, startRecording, stopRecording, updateTest, validateTestSteps, runTestWithEnvironment } from '../api/client';
+import { api, createTest, getDevices, getEnvironments, getProject, getTest, startRecording, stopRecording, updateTest, validateTestSteps, runTestWithEnvironment } from '../api/client';
 import AppHeader from '../components/AppHeader';
 import AppFooter from '../components/AppFooter';
 import StepEditor from '../components/StepEditor';
@@ -148,6 +149,7 @@ export default function TestEditorPage() {
   const [validationResults, setValidationResults] = useState<StepValidationResult[] | undefined>();
   const [validationFeedback, setValidationFeedback] = useState<{ type: 'success' | 'error' | 'info'; text: string } | null>(null);
   const [exportModalOpen, setExportModalOpen] = useState(false);
+  const [exportKind, setExportKind] = useState<'spec' | 'project'>('spec');
   const [exportMode, setExportMode] = useState<'inline' | 'envvars' | 'raw'>('inline');
   const [exportEnvId, setExportEnvId] = useState<string | undefined>(undefined);
   const [deviceOptions, setDeviceOptions] = useState<{ label: string; value: string }[]>([]);
@@ -557,13 +559,14 @@ export default function TestEditorPage() {
     }
   };
 
-  const handleOpenExport = () => {
+  const handleOpenExport = (kind: 'spec' | 'project') => {
+    setExportKind(kind);
     setExportEnvId(recordEnvironments[0]?.id);
     setExportMode(recordEnvironments.length > 0 ? 'inline' : 'raw');
     setExportModalOpen(true);
   };
 
-  const handleDownloadSpec = () => {
+  const handleDownloadExport = () => {
     const params = new URLSearchParams();
     if (exportMode === 'inline' && !exportEnvId) {
       message.warning('Select an environment for inline export');
@@ -577,10 +580,36 @@ export default function TestEditorPage() {
       params.set('useEnvVars', 'true');
     }
 
-    const query = params.toString();
-    const url = `${BACKEND_URL}/tests/${testId}/export${query ? `?${query}` : ''}`;
-    window.open(url, '_blank', 'noopener,noreferrer');
-    setExportModalOpen(false);
+    void (async () => {
+      try {
+        const exportParams = Object.fromEntries(params.entries());
+        const response =
+          exportKind === 'project'
+            ? await api.post(`/tests/${testId}/export-project`, exportParams, {
+                responseType: 'blob'
+              })
+            : await api.get(`/tests/${testId}/export`, {
+                params: exportParams,
+                responseType: 'blob'
+              });
+        const blob = new Blob([response.data], { type: 'text/plain;charset=utf-8' });
+        const url = URL.createObjectURL(blob);
+        const anchor = document.createElement('a');
+        anchor.href = url;
+        anchor.download = `${(checkName || 'check')
+          .toLowerCase()
+          .replace(/[^a-z0-9]+/g, '-')
+          .replace(/(^-|-$)/g, '') || 'check'}${exportKind === 'project' ? '-playwright-project.zip' : '.spec.ts'}`;
+        document.body.appendChild(anchor);
+        anchor.click();
+        anchor.remove();
+        setTimeout(() => URL.revokeObjectURL(url), 0);
+        message.success(exportKind === 'project' ? 'Playwright project exported' : 'Check exported');
+        setExportModalOpen(false);
+      } catch {
+        message.error(exportKind === 'project' ? 'Failed to export Playwright project' : 'Failed to export check');
+      }
+    })();
   };
 
   const handleValidateAndSave = async () => {
@@ -748,6 +777,21 @@ export default function TestEditorPage() {
     : undefined;
   const projectRouteId = currentProjectId ?? projectId;
   const projectLink = projectRouteId ? `/projects/${projectRouteId}` : '/projects';
+  const exportMenu: MenuProps = {
+    items: [
+      { key: 'spec', label: 'Export single spec (.spec.ts)' },
+      { key: 'project', label: 'Export Playwright project (.zip)' }
+    ],
+    onClick: ({ key }) => handleOpenExport(key === 'project' ? 'project' : 'spec')
+  };
+  const exportTrigger = (
+    <Dropdown menu={exportMenu} trigger={['click']}>
+      <Button icon={<DownloadOutlined />} style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+        <span>Export</span>
+        <DownOutlined />
+      </Button>
+    </Dropdown>
+  );
 
   return (
     <Layout style={{ minHeight: '100vh', background: 'linear-gradient(135deg, #f8fafc 0%, #eef2ff 50%, #ffffff 100%)' }}>
@@ -782,13 +826,11 @@ export default function TestEditorPage() {
                   <Button icon={<VideoCameraOutlined />} onClick={handleStartRecording}>
                     Start recording
                   </Button>
-                  <Button icon={<DownloadOutlined />} onClick={handleOpenExport}>
-                    Export .spec.ts
+                  {exportTrigger}
+                  <Button type="primary" loading={saving || validating} disabled={!isDirty || saving || validating} onClick={handleValidateAndSave}>
+                    Save changes
                   </Button>
-              <Button type="primary" loading={saving || validating} disabled={!isDirty || saving || validating} onClick={handleValidateAndSave}>
-                Save changes
-              </Button>
-            </Space>
+                </Space>
           </div>
         </Card>
           </Col>
@@ -1024,9 +1066,7 @@ export default function TestEditorPage() {
           <Space wrap style={{ width: '100%', justifyContent: 'space-between' }}>
             <Space wrap>
               <Button onClick={() => confirmLeave(() => navigate(-1))}>Cancel</Button>
-              <Button icon={<DownloadOutlined />} onClick={handleOpenExport}>
-                Export .spec.ts
-              </Button>
+              {exportTrigger}
             </Space>
             <Space wrap>
               <Button onClick={handleValidateAndSave} loading={saving || validating} disabled={!isDirty || saving || validating}>
@@ -1070,14 +1110,16 @@ export default function TestEditorPage() {
       </Modal>
 
       <Modal
-        title="Export as Playwright spec"
+        title={exportKind === 'project' ? 'Export Playwright project' : 'Export as Playwright spec'}
         open={exportModalOpen}
         onCancel={() => setExportModalOpen(false)}
         footer={null}
       >
         <div style={{ display: 'flex', flexDirection: 'column', gap: 12, width: '100%' }}>
           <Typography.Text type="secondary">
-            Choose how to handle environment variables ({'{{BASE_URL}}'} etc.)
+            {exportKind === 'project'
+              ? 'Choose how to handle environment variables in the generated Playwright project ({\'{{BASE_URL}}\'} etc.)'
+              : 'Choose how to handle environment variables ({\'{{BASE_URL}}\'} etc.)'}
           </Typography.Text>
 
           <Radio.Group value={exportMode} onChange={(event) => setExportMode(event.target.value)}>
@@ -1104,8 +1146,8 @@ export default function TestEditorPage() {
             />
           )}
 
-          <Button type="primary" icon={<DownloadOutlined />} block onClick={handleDownloadSpec}>
-            Download .spec.ts
+          <Button type="primary" icon={<DownloadOutlined />} block onClick={handleDownloadExport}>
+            Download {exportKind === 'project' ? '.zip' : '.spec.ts'}
           </Button>
         </div>
       </Modal>
