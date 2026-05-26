@@ -68,6 +68,39 @@ On an empty database the seed also creates a `Docker Demo` project with two samp
 
 This path is the recommended first launch on any machine. The backend image is built on the Playwright-ready base image and includes the browser bundle, so no host browser or system library setup is required.
 
+## 🖥 Server Prerequisites
+
+For a VPS or bare-metal deploy, make sure these are available first:
+
+- Docker Engine
+- Docker Compose V2 (`docker compose`)
+- a reverse proxy such as nginx if you want a public domain
+- free host ports for the published services if you are not proxying everything through nginx
+
+Recommended Docker overrides for a server deploy:
+
+- `FRONTEND_HOST_PORT`
+- `BACKEND_HOST_PORT`
+- `POSTGRES_HOST_PORT`
+- `REDIS_HOST_PORT`
+- `VNC_HOST_PORT`
+- `NOVNC_HOST_PORT`
+
+Keep container-internal ports unchanged; only adjust the host-facing ports and public URLs when needed.
+
+## 🚀 Server Deployment
+
+For a server deployment:
+
+1. Copy `.env.example` to `.env`
+2. Set `JWT_SECRET` to a long random value
+3. Set `FRONTEND_URL` to your public domain or reverse-proxy URL
+4. Set `VITE_BACKEND_URL` and `VITE_NOVNC_URL` to the URLs users should reach from the browser
+5. Adjust `*_HOST_PORT` values if your VPS already uses ports like `3000`, `5432`, or `6379`
+6. Run `docker compose up --build -d`
+
+If you place nginx in front of the app, proxy the public frontend domain to the frontend container and route backend/API traffic to the backend container. The backend already exposes `/health` and `/health/db` for readiness checks.
+
 ## 🤖 AI Quick Start
 
 If you are working with an AI coding agent, start here first:

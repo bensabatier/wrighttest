@@ -30,6 +30,28 @@ const envCandidates = [
 ];
 const screenshotsDir = path.resolve(process.env.SCREENSHOTS_DIR || './screenshots');
 const tracesDir = path.resolve(process.env.TRACES_DIR || './traces');
+const defaultFrontendOrigins = [
+  'http://localhost:5173',
+  'http://localhost:80',
+  'http://127.0.0.1:5173'
+];
+
+function collectFrontendOrigins() {
+  const origins = new Set<string>(defaultFrontendOrigins);
+
+  for (const candidate of [process.env.FRONTEND_URL, process.env.FRONTEND_DEV_URL]) {
+    if (!candidate) continue;
+
+    try {
+      origins.add(new URL(candidate).origin);
+    } catch {
+      // Ignore invalid URLs and keep the safe defaults.
+    }
+  }
+
+  return [...origins];
+}
+
 const traceViewerRoot = path.join(
   path.dirname(require.resolve('playwright-core/package.json')),
   'lib/vite/traceViewer'
@@ -140,7 +162,8 @@ async function start() {
     prefix: '/trace-viewer/',
     decorateReply: false,
     setHeaders: (res) => {
-      res.setHeader('Content-Security-Policy', "frame-ancestors 'self' http://localhost:5173 http://localhost:80");
+      const frameAncestors = ["'self'", ...collectFrontendOrigins()].join(' ');
+      res.setHeader('Content-Security-Policy', `frame-ancestors ${frameAncestors}`);
     }
   });
 

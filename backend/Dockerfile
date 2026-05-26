@@ -21,4 +21,5 @@ RUN mkdir -p /app/backend/screenshots /app/backend/traces
 
 EXPOSE 3000
 
-CMD sh -c "cd backend && npx prisma migrate deploy && npx prisma db seed && node dist/index.js"
+# TypeScript output lives under dist/src because the backend tsconfig compiles from src/.
+CMD sh -c "cd backend && npx prisma migrate deploy && npx prisma db seed && node dist/src/index.js"

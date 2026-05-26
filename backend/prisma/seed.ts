@@ -4,7 +4,7 @@ import { PrismaClient } from '@prisma/client';
 import bcrypt from 'bcrypt';
 import { config as loadEnv } from 'dotenv';
 import dotenvExpand from 'dotenv-expand';
-import { FALLBACK_ADMIN_EMAIL } from '../src/utils/project-access';
+import { FALLBACK_ADMIN_EMAIL } from '../src/constants/admin';
 
 const prisma = new PrismaClient();
 

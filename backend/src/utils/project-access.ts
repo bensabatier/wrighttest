@@ -1,6 +1,7 @@
 import type { FastifyRequest } from 'fastify';
 import type { ProjectMember, ProjectMemberStatus, ProjectRole } from '@prisma/client';
 import prisma from '../prisma';
+import { FALLBACK_ADMIN_EMAIL } from '../constants/admin';
 
 export type AuthUser = {
   userId: string;
@@ -19,8 +20,6 @@ const ROLE_RANK: Record<ProjectRole, number> = {
   EDITOR: 2,
   VIEWER: 1
 };
-
-export const FALLBACK_ADMIN_EMAIL = 'admin@wrighttest.app';
 
 function normalizeEmail(email: string) {
   return email.trim().toLowerCase();
