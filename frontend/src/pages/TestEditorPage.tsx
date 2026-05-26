@@ -17,6 +17,16 @@ const BACKEND_URL = import.meta.env.VITE_BACKEND_URL ?? 'http://localhost:3000';
 const NOVNC_URL = import.meta.env.VITE_NOVNC_URL ?? 'http://localhost:6080';
 const ENABLE_NOVNC = import.meta.env.VITE_ENABLE_NOVNC !== 'false';
 
+function resolveNoVncWebsocketPath(baseUrl: string) {
+  try {
+    const resolved = new URL(baseUrl, window.location.origin);
+    const basePath = resolved.pathname.replace(/\/$/, '');
+    return `${basePath}/websockify`;
+  } catch {
+    return '/websockify';
+  }
+}
+
 function collectVariableNames(environments: Environment[]) {
   return Array.from(
     new Set(environments.flatMap((environment) => Object.keys(environment.variables ?? {})))
@@ -170,6 +180,8 @@ export default function TestEditorPage() {
   const checkName = Form.useWatch('name', form);
   const selectedUrl = Form.useWatch('url', form);
   const selectedDevice = Form.useWatch('device', form);
+  const noVncBaseUrl = NOVNC_URL.replace(/\/$/, '');
+  const noVncWebsocketPath = resolveNoVncWebsocketPath(NOVNC_URL);
 
   useEffect(() => {
     initialSnapshotRef.current = '';
@@ -259,7 +271,7 @@ export default function TestEditorPage() {
     let cancelled = false;
     const controller = new AbortController();
 
-    void fetch(`${NOVNC_URL}/vnc.html`, {
+    void fetch(`${noVncBaseUrl}/vnc.html`, {
       method: 'GET',
       mode: 'no-cors',
       signal: controller.signal
@@ -1044,7 +1056,7 @@ export default function TestEditorPage() {
                       Live browser session:
                     </Text>
                     <iframe
-                      src={`${NOVNC_URL}/vnc.html?autoconnect=true&resize=scale&view_only=false`}
+                      src={`${noVncBaseUrl}/vnc.html?autoconnect=true&resize=scale&view_only=false&path=${encodeURIComponent(noVncWebsocketPath)}`}
                       style={{ width: '100%', height: 500, border: '1px solid #d9d9d9', borderRadius: 8 }}
                       title="Live browser"
                     />

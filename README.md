@@ -96,6 +96,8 @@ For a server deployment:
 2. Set `JWT_SECRET` to a long random value
 3. Set `FRONTEND_URL` to your public domain or reverse-proxy URL
 4. Set `VITE_BACKEND_URL` and `VITE_NOVNC_URL` to the URLs users should reach from the browser
+   - local example: `http://localhost:6080`
+   - reverse-proxy example: `/vnc`
 5. Adjust `*_HOST_PORT` values if your VPS already uses ports like `3000`, `5432`, or `6379`
 6. Run `docker compose up --build -d`
 
