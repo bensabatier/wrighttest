@@ -358,7 +358,7 @@ export default function StepEditor({ steps, onChange, readOnly = false, validati
                   />
                   {step.action === 'fill' && (
                     <Text type="secondary" style={{ fontSize: 12, lineHeight: 1.3, minHeight: 32, display: 'block' }}>
-                      Use <code style={{ background: '#f0f0f0', padding: '2px 4px', borderRadius: 2 }}>{{'{uuid}'}}</code> to generate a unique ID on each run.
+                      Use <code style={{ background: '#f0f0f0', padding: '2px 4px', borderRadius: 2 }}>{'{uuid}'}</code> to generate a unique ID on each run.
                     </Text>
                   )}
                   {fieldIssue?.value ? (
