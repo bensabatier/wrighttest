@@ -341,6 +341,7 @@ export async function stopRecording(id: string): Promise<Step[]> {
   let steps: Step[] = [];
   try {
     const code = await fsPromises.readFile(session.outputFile, 'utf-8');
+    console.log('[Codegen ${id}] Recording stopped. Parsing output file...', code);
     steps = parseCodegenOutput(code);
     console.log(`[Codegen ${id}] Recording stopped. Parsed ${steps.length} steps.`);
   } catch (error) {
