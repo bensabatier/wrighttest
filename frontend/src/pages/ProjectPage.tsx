@@ -2919,7 +2919,6 @@ export default function ProjectPage() {
         confirmLoading={runningSuite}
         okButtonProps={{ disabled: suites.length === 0 }}
       >
-        {suites.length === 0 ? (
           <Empty
             image={Empty.PRESENTED_IMAGE_SIMPLE}
             description={
@@ -2933,7 +2932,6 @@ export default function ProjectPage() {
               Create suite
             </Button>
           </Empty>
-        ) : (
           <Space direction="vertical" style={{ width: '100%' }} size={16}>
             <div>
               <Text type="secondary">Suite</Text>
@@ -2966,7 +2964,7 @@ export default function ProjectPage() {
               </Radio.Group>
             </div>
           </Space>
-        )}
+        
       </Modal>
 
       <Modal
