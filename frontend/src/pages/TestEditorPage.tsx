@@ -216,7 +216,6 @@ export default function TestEditorPage() {
   const [initialSnapshotReady, setInitialSnapshotReady] = useState(false);
   const [selectedStepIndices, setSelectedStepIndices] = useState<Set<number>>(new Set());
   const [showStepSelection, setShowStepSelection] = useState(false);
-  const [recordFromStepIndex, setRecordFromStepIndex] = useState<number | undefined>(undefined);
   const stepsRef = useRef<Step[]>([]);
   const initialSnapshotRef = useRef<string>('');
   const navigate = useNavigate();
@@ -616,13 +615,10 @@ export default function TestEditorPage() {
         recordingProjectId || currentProjectId || projectId || '', 
         selectedRecordingEnvironmentId || undefined, 
         device,
-        recordFromStepIndex,
-        recordFromStepIndex ? steps : undefined
       );
       setSessionId(data.sessionId);
       setRecording(true);
       setRecordModalOpen(false);
-      setRecordFromStepIndex(undefined);
       message.info('Browser opened. Interact with the page, then click Stop Recording.');
     } catch (error) {
       const responseError = error && typeof error === 'object' && 'response' in error
@@ -1230,28 +1226,6 @@ export default function TestEditorPage() {
               </Text>
             )}
           </div>
-          
-          {steps.length > 1 && (
-            <div>
-              <Label style={{ display: 'block', marginBottom: 8 }}>Record from step (optional)</Label>
-              <Select
-                placeholder="Record from the beginning (default)"
-                value={recordFromStepIndex ?? undefined}
-                onChange={(value) => setRecordFromStepIndex(value === undefined ? undefined : value)}
-                style={{ width: '100%' }}
-              >
-                <Select.Option value={undefined}>Record from the beginning</Select.Option>
-                {steps.map((step, index) => (
-                  <Select.Option key={index} value={index + 1}>
-                    From Step {index + 1} - {humanizeStepAction(step.action)}
-                  </Select.Option>
-                ))}
-              </Select>
-              <Text type="secondary" style={{ display: 'block', marginTop: 8, fontSize: 12 }}>
-                Select a step to resume recording from that point. Previous steps will be replayed automatically.
-              </Text>
-            </div>
-          )}
         </div>
       </Modal>
 
