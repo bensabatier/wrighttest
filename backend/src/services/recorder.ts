@@ -58,120 +58,92 @@ function extractFirstStringArgument(argumentsText: string): string | null {
 }
 
 function parseCodegenLine(trimmed: string): Step | null {
-  const gotoMatch = trimmed.match(/^await\s+page\.goto\(([\s\S]+?)\);?$/);
-  if (gotoMatch) {
-    const url = extractFirstStringArgument(gotoMatch[1]);
-    if (!url) return null;
-    return { action: 'goto', value: url };
-  }
+  // 1. Define the handler logic
+  const handlers: { pattern: RegExp; handler: (m: RegExpMatchArray) => Step | null }[] = [
+    {
+      pattern: /^await\s+page\.goto\(([\s\S]+?)\);?$/,
+      handler: (m) => {
+        const url = extractFirstStringArgument(m[1]);
+        return url ? { action: 'goto', value: url } : null;
+      }
+    },
+    {
+      pattern: /^await\s+page\.keyboard\.press\((.+)\);?$/,
+      handler: (m) => {
+        const key = extractFirstStringArgument(m[1]);
+        return key ? { action: 'keyboardPress', value: key } : null;
+      }
+    },
+    {
+      pattern: /^await\s+(.+?)\.(click|fill|press|selectOption|check|uncheck)\(([\s\S]*?)\);?$/,
+      handler: (m) => {
+        const selector = m[1].replace(/\.$/, '');
+        const method = m[2];
+        const args = m[3].trim();
 
-  const keyboardPressMatch = trimmed.match(/^await\s+page\.keyboard\.press\((.+)\);?$/);
-  if (keyboardPressMatch) {
-    const key = extractFirstStringArgument(keyboardPressMatch[1]);
-    if (!key) return null;
-    return { action: 'keyboardPress', value: key };
-  }
+        if (['click', 'check', 'uncheck'].includes(method)) {
+          return { action: 'click', selector, selectorCandidates: deriveSelectorCandidates(selector) };
+        }
+        
+        const value = extractFirstStringArgument(args);
+        if (!value) return null;
 
-  const actionMatch = trimmed.match(
-    /^await\s+(.+?)\.(click|fill|press|selectOption|check|uncheck)\(([\s\S]*?)\);?$/
-  );
-  if (!actionMatch) return null;
+        if (method === 'fill') return { action: 'fill', selector, value };
+        if (method === 'press') return { action: 'press', selector, value };
+        if (method === 'selectOption') return { action: 'selectOption', selector, value };
+        return null;
+      }
+    },
+    {
+      pattern: /^await\s+expect\(page\)\.toHaveURL\(([\s\S]+?)\);?$/,
+      handler: (m) => {
+        const expected = extractFirstStringArgument(m[1]);
+        return expected ? { action: 'assertURL', expected } : null;
+      }
+    },
+    {
+      pattern: /^await\s+expect\(page\)\.toHaveTitle\(([\s\S]+?)\);?$/,
+      handler: (m) => {
+        const expected = extractFirstStringArgument(m[1]);
+        return expected ? { action: 'assertTitle', expected } : null;
+      }
+    },
+    {
+      pattern: /^await\s+expect\((page\..+?)\)\.(toBeVisible|toBeHidden|toBeChecked)\(([\s\S]*?)\);?$/,
+      handler: (m) => ({ action: m[2].replace('toBe', 'assert'), selector: m[1] } as Step)
+    },
+    {
+      pattern: /^await\s+expect\((page\..+?)\)\.(toHaveText|toContainText)\(([\s\S]*?)\);?$/,
+      handler: (m) => {
+        const expected = extractFirstStringArgument(m[3]);
+        return expected ? { 
+          action: 'assertText', 
+          selector: m[1], 
+          expected, 
+          options: { exact: m[2] === 'toHaveText' } 
+        } : null;
+      }
+    },
+    {
+      pattern: /^await\s+expect\((page\..+?)\)\.toHaveValue\(([\s\S]*?)\);?$/,
+      handler: (m) => {
+        const expected = extractFirstStringArgument(m[2]);
+        return expected ? { action: 'assertValue', selector: m[1], expected } : null;
+      }
+    },
+    {
+      pattern: /^await\s+expect\((page\..+?)\)\.toHaveCount\(([\s\S]*?)\);?$/,
+      handler: (m) => {
+        const expected = extractFirstStringArgument(m[2]) ?? m[2].trim();
+        return expected ? { action: 'assertCount', selector: m[1], expected } : null;
+      }
+    }
+  ];
 
-  const selector = actionMatch[1].replace(/\.$/, '');
-  const method = actionMatch[2];
-  const args = actionMatch[3].trim();
-
-  if (method === 'click' || method === 'check' || method === 'uncheck') {
-    return {
-      action: 'click',
-      selector,
-      selectorCandidates: deriveSelectorCandidates(selector)
-    };
-  }
-
-  if (method === 'fill') {
-    const value = extractFirstStringArgument(args);
-    if (!value) return null;
-    return { action: 'fill', selector, value };
-  }
-
-  if (method === 'press') {
-    const key = extractFirstStringArgument(args);
-    if (!key) return null;
-    return { action: 'press', selector, value: key };
-  }
-
-  if (method === 'selectOption') {
-    const value = extractFirstStringArgument(args);
-    if (!value) return null;
-    return { action: 'selectOption', selector, value };
-  }
-
-  const expectURLMatch = trimmed.match(/^await\s+expect\(page\)\.toHaveURL\(([\s\S]+?)\);?$/);
-  if (expectURLMatch) {
-    const expected = extractFirstStringArgument(expectURLMatch[1]);
-    if (!expected) return null;
-    return { action: 'assertURL', expected };
-  }
-
-  const expectTitleMatch = trimmed.match(/^await\s+expect\(page\)\.toHaveTitle\(([\s\S]+?)\);?$/);
-  if (expectTitleMatch) {
-    const expected = extractFirstStringArgument(expectTitleMatch[1]);
-    if (!expected) return null;
-    return { action: 'assertTitle', expected };
-  }
-
-  const expectVisibleMatch = trimmed.match(/^await\s+expect\((page\..+?)\)\.toBeVisible\(([\s\S]*?)\);?$/);
-  if (expectVisibleMatch) {
-    return { action: 'assertVisible', selector: expectVisibleMatch[1] };
-  }
-
-  const expectHiddenMatch = trimmed.match(/^await\s+expect\((page\..+?)\)\.toBeHidden\(([\s\S]*?)\);?$/);
-  if (expectHiddenMatch) {
-    return { action: 'assertHidden', selector: expectHiddenMatch[1] };
-  }
-
-  const expectTextMatch = trimmed.match(/^await\s+expect\((page\..+?)\)\.toHaveText\(([\s\S]+?)\);?$/);
-  if (expectTextMatch) {
-    const expected = extractFirstStringArgument(expectTextMatch[2]);
-    if (!expected) return null;
-    return {
-      action: 'assertText',
-      selector: expectTextMatch[1],
-      expected,
-      options: { exact: true }
-    };
-  }
-
-  const containTextMatch = trimmed.match(/^await\s+expect\((page\..+?)\)\.toContainText\(([\s\S]+?)\);?$/);
-  if (containTextMatch) {
-    const expected = extractFirstStringArgument(containTextMatch[2]);
-    if (!expected) return null;
-    return {
-      action: 'assertText',
-      selector: containTextMatch[1],
-      expected,
-      options: { exact: false }
-    };
-  }
-
-  const valueMatch = trimmed.match(/^await\s+expect\((page\..+?)\)\.toHaveValue\(([\s\S]+?)\);?$/);
-  if (valueMatch) {
-    const expected = extractFirstStringArgument(valueMatch[2]);
-    if (!expected) return null;
-    return { action: 'assertValue', selector: valueMatch[1], expected };
-  }
-
-  const checkedMatch = trimmed.match(/^await\s+expect\((page\..+?)\)\.toBeChecked\(([\s\S]*?)\);?$/);
-  if (checkedMatch) {
-    return { action: 'assertChecked', selector: checkedMatch[1] };
-  }
-
-  const countMatch = trimmed.match(/^await\s+expect\((page\..+?)\)\.toHaveCount\(([\s\S]+?)\);?$/);
-  if (countMatch) {
-    const expected = extractFirstStringArgument(countMatch[2]) ?? countMatch[2].trim();
-    if (!expected) return null;
-    return { action: 'assertCount', selector: countMatch[1], expected };
+  // 2. Execution Loop
+  for (const { pattern, handler } of handlers) {
+    const match = trimmed.match(pattern);
+    if (match) return handler(match);
   }
 
   return null;
