@@ -17,7 +17,6 @@ interface RecordingSession {
   projectId: string;
   userId: string;
   status: 'active' | 'stopped';
-  prependSteps?: Step[];
 }
 
 const sessions = new Map<string, RecordingSession>();
@@ -259,7 +258,7 @@ async function assertRecordingBrowserAvailable(device?: string) {
   }
 }
 
-export async function startRecording(startUrl: string, device?: string, projectId?: string, userId?: string, fromStepIndex?: number, existingSteps?: Step[]): Promise<string> {
+export async function startRecording(startUrl: string, device?: string, projectId?: string, userId?: string): Promise<string> {
   await fsPromises.mkdir(TMP_DIR, { recursive: true });
 
   const id = uuidv4();
@@ -317,8 +316,6 @@ export async function startRecording(startUrl: string, device?: string, projectI
     console.error(`[Codegen ${id}] Failed to start:`, error);
   });
 
-  const prependSteps = fromStepIndex && existingSteps ? existingSteps.slice(0, fromStepIndex) : undefined;
-
   sessions.set(id, {
     id,
     process: proc,
@@ -326,8 +323,7 @@ export async function startRecording(startUrl: string, device?: string, projectI
     startUrl: resolvedUrl,
     projectId: projectId ?? '',
     userId: userId ?? '',
-    status: 'active',
-    prependSteps
+    status: 'active'
   });
 
   return id;
@@ -351,10 +347,6 @@ export async function stopRecording(id: string): Promise<Step[]> {
   } finally {
     await fsPromises.rm(session.outputFile, { force: true });
     sessions.delete(id);
-  }
-
-  if (session.prependSteps && session.prependSteps.length > 0) {
-    steps = [...session.prependSteps, ...steps];
   }
 
   return steps;

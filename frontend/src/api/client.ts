@@ -263,14 +263,12 @@ export const validateTestSteps = (projectId: string, url: string, steps: Step[],
     device: device || undefined
   }).then((r) => r.data);
 
-export const startRecording = (url: string, projectId: string, environmentId?: string, device?: string, fromStepIndex?: number, existingSteps?: Step[]) =>
+export const startRecording = (url: string, projectId: string, environmentId?: string, device?: string) =>
   api.post<{ sessionId: string; status: string }>('/recordings/start', {
     url,
     projectId,
     environmentId,
-    device,
-    fromStepIndex,
-    existingSteps
+    device
   }).then((r) => r.data);
 
 export const stopRecording = (sessionId: string) =>

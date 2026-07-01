@@ -9,9 +9,7 @@ const StartSchema = z.object({
   projectId: z.string().min(1),
   url: z.string().min(1),
   environmentId: z.string().optional(),
-  device: z.string().optional(),
-  fromStepIndex: z.number().int().min(0).optional(),
-  existingSteps: z.array(z.any()).optional()
+  device: z.string().optional()
 });
 
 export async function recordingRoutes(fastify: FastifyInstance) {
@@ -54,14 +52,7 @@ export async function recordingRoutes(fastify: FastifyInstance) {
         });
       }
 
-      const sessionId = await startRecording(
-        resolvedUrl,
-        result.data.device,
-        result.data.projectId,
-        userId,
-        result.data.fromStepIndex,
-        result.data.existingSteps
-      );
+      const sessionId = await startRecording(resolvedUrl, result.data.device, result.data.projectId, userId);
       return reply.status(201).send({ sessionId, status: 'active' });
     } catch (err) {
       return reply.status(500).send({
