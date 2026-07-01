@@ -39,7 +39,7 @@ export async function recordingRoutes(fastify: FastifyInstance) {
           return reply.status(404).send({ error: 'Environment not found' });
         }
 
-        resolvedUrl = interpolate(result.data.url, (environment.variables ?? {}) as Record<string, string>);
+        resolvedUrl = interpolate(result.data.url, (environment.variables ?? {}) as Record<string, string>, crypto.randomUUID());
 
         if (/\{\{\w+\}\}/.test(resolvedUrl)) {
           return reply.status(400).send({
