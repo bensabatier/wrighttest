@@ -163,10 +163,21 @@ function humanizeStepAction(action: StepAction) {
 }
 
 function variableHint(value?: string) {
-  if (!value || !value.includes('{{')) return null;
+  if (!value) return null;
+  
+  const hasVariable = value.includes('{{');
+  const hasUuid = value.includes('{uuid}');
+  
+  if (!hasVariable && !hasUuid) return null;
+
+  const tooltipText = hasVariable && hasUuid 
+    ? 'Variables and UUID will be replaced at runtime' 
+    : hasVariable 
+    ? 'Variable will be replaced at runtime'
+    : 'UUID will be generated at runtime';
 
   return (
-    <Tooltip title="Variable will be replaced at runtime">
+    <Tooltip title={tooltipText}>
       <InfoCircleOutlined style={{ color: '#1677ff' }} />
     </Tooltip>
   );
@@ -335,27 +346,20 @@ export default function StepEditor({ steps, onChange, readOnly = false, validati
 
               {needsValue && (
                 <div style={{ flex: '1 1 320px', minWidth: 0, display: 'grid', gap: 4 }}>
-                  {step.action === 'fill' ? (
-                    <Input
-                      placeholder="Value"
-                      value={step.value ?? ''}
-                      style={{ width: '100%' }}
-                      disabled={readOnly}
-                      status={fieldIssue?.value ? 'error' : undefined}
-                      onChange={(event) => updateStep(index, { value: event.target.value })}
-                      onInput={(event) => updateStep(index, { value: event.currentTarget.value })}
-                    />
-                  ) : (
-                    <VariableAutocompleteInput
-                      placeholder={step.action === 'goto' ? 'https://example.com' : 'Value'}
-                      value={step.value ?? ''}
-                      style={{ width: '100%' }}
-                      disabled={readOnly}
-                      status={fieldIssue?.value ? 'error' : undefined}
-                      suffix={variableHint(step.value)}
-                      variableNames={variableNames}
-                      onValueChange={(nextValue) => updateStep(index, { value: nextValue })}
-                    />
+                  <VariableAutocompleteInput
+                    placeholder={step.action === 'goto' ? 'https://example.com' : step.action === 'fill' ? 'e.g., Text-{uuid}' : 'Value'}
+                    value={step.value ?? ''}
+                    style={{ width: '100%' }}
+                    disabled={readOnly}
+                    status={fieldIssue?.value ? 'error' : undefined}
+                    suffix={variableHint(step.value)}
+                    variableNames={variableNames}
+                    onValueChange={(nextValue) => updateStep(index, { value: nextValue })}
+                  />
+                  {step.action === 'fill' && (
+                    <Text type="secondary" style={{ fontSize: 12, lineHeight: 1.3, minHeight: 32, display: 'block' }}>
+                      Use <code style={{ background: '#f0f0f0', padding: '2px 4px', borderRadius: 2 }}>{{'{uuid}'}}</code> to generate a unique ID on each run.
+                    </Text>
                   )}
                   {fieldIssue?.value ? (
                     <Text type="danger" style={{ fontSize: 12, lineHeight: 1.4 }}>
