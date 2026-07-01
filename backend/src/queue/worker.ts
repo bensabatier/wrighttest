@@ -205,7 +205,8 @@ async function runTest(job: Job<TestJobData>) {
     }
   }
 
-  const steps = (test.steps as unknown as Step[]).map((step) => interpolateStep(step, variables));
+  const randomUUID = crypto.randomUUID();//Generate a uuid for this run
+  const steps = (test.steps as unknown as Step[]).map((step) => interpolateStep(step, variables, randomUUID));
   const deviceConfig = test.device && test.device in devices ? devices[test.device as keyof typeof devices] : {};
 
   if (test.device && !(test.device in devices)) {
