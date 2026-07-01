@@ -342,6 +342,7 @@ export async function stopRecording(id: string): Promise<Step[]> {
   try {
     const code = await fsPromises.readFile(session.outputFile, 'utf-8');
     steps = parseCodegenOutput(code);
+    console.log(`[Codegen ${id}] Recording stopped. Parsed ${steps.length} steps.`);
   } catch (error) {
     console.warn(`[Codegen ${id}] Output file not found or unreadable:`, error);
   } finally {
