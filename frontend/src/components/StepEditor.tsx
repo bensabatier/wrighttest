@@ -68,6 +68,10 @@ interface Props {
     expected?: string;
   } | undefined>;
   variableNames?: string[];
+  selectedStepIndices?: Set<number>;
+  onSelectionChange?: (indices: Set<number>) => void;
+  showStepSelection?: boolean;
+  onToggleSelection?: (show: boolean) => void;
 }
 
 const statusStyles: Record<StepValidationResult['status'], { backgroundColor?: string; border?: string }> = {
@@ -183,10 +187,45 @@ function variableHint(value?: string) {
   );
 }
 
-export default function StepEditor({ steps, onChange, readOnly = false, validationResults, stepIssues = [], variableNames = [] }: Props) {
+export default function StepEditor({ 
+  steps, 
+  onChange, 
+  readOnly = false, 
+  validationResults, 
+  stepIssues = [], 
+  variableNames = [],
+  selectedStepIndices = new Set(),
+  onSelectionChange,
+  showStepSelection = false,
+  onToggleSelection
+}: Props) {
   const addStep = () => onChange([...steps, { action: 'goto', value: '' }]);
 
   const removeStep = (index: number) => onChange(steps.filter((_, idx) => idx !== index));
+  
+  const removeSteps = (indices: Set<number>) => {
+    onChange(steps.filter((_, idx) => !indices.has(idx)));
+    onSelectionChange?.(new Set());
+  };
+
+  const toggleStepSelection = (index: number) => {
+    const newSelection = new Set(selectedStepIndices);
+    if (newSelection.has(index)) {
+      newSelection.delete(index);
+    } else {
+      newSelection.add(index);
+    }
+    onSelectionChange?.(newSelection);
+  };
+
+  const selectAllSteps = () => {
+    const allIndices = new Set(steps.map((_, idx) => idx));
+    onSelectionChange?.(allIndices);
+  };
+
+  const deselectAllSteps = () => {
+    onSelectionChange?.(new Set());
+  };
 
   const duplicateStep = (index: number) => {
     const cloned = { ...steps[index] };
@@ -273,6 +312,13 @@ export default function StepEditor({ steps, onChange, readOnly = false, validati
             }
               title={
                 <Space size={8}>
+                  {showStepSelection && (
+                    <Checkbox
+                      checked={selectedStepIndices.has(index)}
+                      onChange={() => toggleStepSelection(index)}
+                      onClick={(e) => e.stopPropagation()}
+                    />
+                  )}
                   <HolderOutlined style={{ color: '#8c8c8c', cursor: 'grab' }} />
                 <span style={{ color: opt.group === 'Assertions' ? '#722ed1' : '#1677ff' }}>
                   {opt.icon}
@@ -432,9 +478,55 @@ export default function StepEditor({ steps, onChange, readOnly = false, validati
           </Card>
         );
       })}
-      <Button icon={<PlusOutlined />} onClick={addStep} type="dashed" block disabled={readOnly}>
-        Add step
-      </Button>
+      {showStepSelection && selectedStepIndices.size > 0 && (
+        <Card
+          size="small"
+          style={{
+            borderRadius: 16,
+            backgroundColor: '#fafafa',
+            borderLeft: '3px solid #1677ff'
+          }}
+        >
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <Space>
+              <Text>
+                {selectedStepIndices.size} step{selectedStepIndices.size !== 1 ? 's' : ''} selected
+              </Text>
+              <Button size="small" type="text" onClick={selectAllSteps}>
+                Select all
+              </Button>
+              <Button size="small" type="text" onClick={deselectAllSteps}>
+                Deselect all
+              </Button>
+            </Space>
+            <Button
+              danger
+              onClick={() => removeSteps(selectedStepIndices)}
+              disabled={readOnly}
+            >
+              Delete selected
+            </Button>
+          </div>
+        </Card>
+      )}
+      <Space style={{ width: '100%' }}>
+        <Button icon={<PlusOutlined />} onClick={addStep} type="dashed" block disabled={readOnly}>
+          Add step
+        </Button>
+        {!showStepSelection && steps.length > 0 && (
+          <Button type="text" onClick={() => onToggleSelection?.(true)} style={{ width: 'auto' }} disabled={readOnly}>
+            Select steps for deletion
+          </Button>
+        )}
+        {showStepSelection && (
+          <Button type="text" onClick={() => {
+            onToggleSelection?.(false);
+            onSelectionChange?.(new Set());
+          }} style={{ width: 'auto' }} disabled={readOnly}>
+            Cancel selection
+          </Button>
+        )}
+      </Space>
     </div>
   );
 }
