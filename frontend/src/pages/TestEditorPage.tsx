@@ -9,11 +9,10 @@ import AppFooter from '../components/AppFooter';
 import StepEditor from '../components/StepEditor';
 import VariableAutocompleteInput from '../components/VariableAutocompleteInput';
 import UserMenu from '../components/UserMenu';
-import type { Environment, Step, StepValidationResult, Test, StepAction } from '../types';
+import type { Environment, Step, StepValidationResult, Test } from '../types';
 
 const { Content } = Layout;
 const { Title, Text } = Typography;
-const Label = Form.Item;
 const BACKEND_URL = import.meta.env.VITE_BACKEND_URL ?? 'http://localhost:3000';
 const NOVNC_URL = import.meta.env.VITE_NOVNC_URL ?? 'http://localhost:6080';
 const ENABLE_NOVNC = import.meta.env.VITE_ENABLE_NOVNC !== 'false';
@@ -140,27 +139,6 @@ function validateCurrentSteps(steps: Step[]) {
   };
 }
 
-function humanizeStepAction(action: StepAction) {
-  const actionLabels: Record<StepAction, string> = {
-    goto: 'Navigate to URL',
-    click: 'Click element',
-    fill: 'Fill input',
-    press: 'Press key',
-    keyboardPress: 'Keyboard press',
-    selectOption: 'Select option',
-    assertVisible: 'Assert visible',
-    assertHidden: 'Assert hidden',
-    assertText: 'Assert text',
-    assertValue: 'Assert value',
-    assertURL: 'Assert URL',
-    assertTitle: 'Assert title',
-    assertChecked: 'Assert checked',
-    assertCount: 'Assert count',
-    waitForSelector: 'Wait for element'
-  };
-  return actionLabels[action] ?? action;
-}
-
 function formatStepIssueSummary(step: Step, index: number, issue: StepIssue) {
   const actionLabels: Record<Step['action'], string> = {
     goto: 'Navigate to URL',
@@ -214,9 +192,6 @@ export default function TestEditorPage() {
   const [stepIssues, setStepIssues] = useState<Array<StepIssue | undefined>>([]);
   const [firstInvalidStepIndex, setFirstInvalidStepIndex] = useState<number | null>(null);
   const [initialSnapshotReady, setInitialSnapshotReady] = useState(false);
-  const [selectedStepIndices, setSelectedStepIndices] = useState<Set<number>>(new Set());
-  const [showStepSelection, setShowStepSelection] = useState(false);
-  const [recordFromStepIndex, setRecordFromStepIndex] = useState<number | undefined>(undefined);
   const stepsRef = useRef<Step[]>([]);
   const initialSnapshotRef = useRef<string>('');
   const navigate = useNavigate();
@@ -611,18 +586,10 @@ export default function TestEditorPage() {
 
     setRecordLoading(true);
     try {
-      const data = await startRecording(
-        url, 
-        recordingProjectId || currentProjectId || projectId || '', 
-        selectedRecordingEnvironmentId || undefined, 
-        device,
-        recordFromStepIndex,
-        recordFromStepIndex ? steps : undefined
-      );
+      const data = await startRecording(url, recordingProjectId || currentProjectId || projectId || '', selectedRecordingEnvironmentId || undefined, device);
       setSessionId(data.sessionId);
       setRecording(true);
       setRecordModalOpen(false);
-      setRecordFromStepIndex(undefined);
       message.info('Browser opened. Interact with the page, then click Stop Recording.');
     } catch (error) {
       const responseError = error && typeof error === 'object' && 'response' in error
@@ -1134,10 +1101,6 @@ export default function TestEditorPage() {
                     stepIssues={stepIssues}
                     validationResults={validationResults}
                     variableNames={environmentVariableNames}
-                    selectedStepIndices={selectedStepIndices}
-                    onSelectionChange={setSelectedStepIndices}
-                    showStepSelection={showStepSelection}
-                    onToggleSelection={setShowStepSelection}
                   />
                 ) : (
                   <Card style={{ borderRadius: 16, background: '#fafafa' }}>
@@ -1204,55 +1167,28 @@ export default function TestEditorPage() {
         onCancel={() => setRecordModalOpen(false)}
         confirmLoading={recordLoading}
       >
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-          <div>
-            <Label style={{ display: 'block', marginBottom: 8 }}>Environment (if using variables)</Label>
-            <Radio.Group
-              style={{ display: 'grid', gap: 12, width: '100%' }}
-              value={selectedRecordingEnvironmentId ?? ''}
-              onChange={(event) => setSelectedRecordingEnvironmentId(event.target.value || undefined)}
-            >
-              <Radio value="" disabled={recordingUrlHasTemplate}>
-                No environment (use values as-is)
-              </Radio>
-              {recordEnvironments.map((environment) => (
-                <Radio key={environment.id} value={environment.id}>
-                  {environment.name}
-                  <Text type="secondary" style={{ marginLeft: 8 }}>
-                    {Object.keys(environment.variables).length} variables
-                  </Text>
-                </Radio>
-              ))}
-            </Radio.Group>
-            {recordEnvironments.length > 0 && (
-              <Text type="secondary" style={{ display: 'block', marginTop: 12 }}>
-                When Start URL contains {'{{VARIABLE}}'}, choose the environment that defines it.
+        <Radio.Group
+          style={{ display: 'grid', gap: 12, width: '100%' }}
+          value={selectedRecordingEnvironmentId ?? ''}
+          onChange={(event) => setSelectedRecordingEnvironmentId(event.target.value || undefined)}
+        >
+          <Radio value="" disabled={recordingUrlHasTemplate}>
+            No environment (use values as-is)
+          </Radio>
+          {recordEnvironments.map((environment) => (
+            <Radio key={environment.id} value={environment.id}>
+              {environment.name}
+              <Text type="secondary" style={{ marginLeft: 8 }}>
+                {Object.keys(environment.variables).length} variables
               </Text>
-            )}
-          </div>
-          
-          {steps.length > 1 && (
-            <div>
-              <Label style={{ display: 'block', marginBottom: 8 }}>Record from step (optional)</Label>
-              <Select
-                placeholder="Record from the beginning (default)"
-                value={recordFromStepIndex ?? undefined}
-                onChange={(value) => setRecordFromStepIndex(value === undefined ? undefined : value)}
-                style={{ width: '100%' }}
-              >
-                <Select.Option value={undefined}>Record from the beginning</Select.Option>
-                {steps.map((step, index) => (
-                  <Select.Option key={index} value={index + 1}>
-                    From Step {index + 1} - {humanizeStepAction(step.action)}
-                  </Select.Option>
-                ))}
-              </Select>
-              <Text type="secondary" style={{ display: 'block', marginTop: 8, fontSize: 12 }}>
-                Select a step to resume recording from that point. Previous steps will be replayed automatically.
-              </Text>
-            </div>
-          )}
-        </div>
+            </Radio>
+          ))}
+        </Radio.Group>
+        {recordEnvironments.length > 0 && (
+          <Text type="secondary" style={{ display: 'block', marginTop: 12 }}>
+            When Start URL contains {'{{VARIABLE}}'}, choose the environment that defines it.
+          </Text>
+        )}
       </Modal>
 
       <Modal
