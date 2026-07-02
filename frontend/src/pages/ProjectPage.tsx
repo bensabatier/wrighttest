@@ -1754,6 +1754,9 @@ export default function ProjectPage() {
                   items={tabs.map((tab) => ({ key: tab.key, label: tab.label }))}
                   onChange={(key) => setActiveTab(key as ProjectTabKey)}
                 />
+                <Button size="medium" onClick={() => navigate(`/projects/${projectId}/suites`)}>
+                  Suites
+                </Button>
               </div>
             </Card>
           </Col>
