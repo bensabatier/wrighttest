@@ -2101,9 +2101,9 @@ export default function ProjectPage() {
                           )
                       },
                       {
-                        title: 'Open',
+                        title: 'Open Run',
                         render: (_: unknown, row: ProjectCheck) => (
-                          <Button size="small" onClick={() => openCheck(row.id)}>
+                          <Button size="small" onClick={() => navigate(`/runs/${row.latestRun?.id}`)}>
                             Open
                           </Button>
                         )
