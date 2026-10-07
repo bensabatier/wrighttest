@@ -10,6 +10,14 @@ import StepEditor from '../components/StepEditor';
 import TestDataEditor from '../components/test-data/TestDataEditor';
 import VariableAutocompleteInput from '../components/VariableAutocompleteInput';
 import UserMenu from '../components/UserMenu';
+import type { Environment, Step, StepValidationResult, Test, StepAction } from '../types';
+
+const { Content } = Layout;
+const { Title, Text } = Typography;
+const Label = Form.Item;
+const BACKEND_URL = import.meta.env.VITE_BACKEND_URL ?? 'http://localhost:3000';
+const NOVNC_URL = import.meta.env.VITE_NOVNC_URL ?? 'http://localhost:6080';
+const ENABLE_NOVNC = import.meta.env.VITE_ENABLE_NOVNC !== 'false';
 import type { Environment, Step, StepValidationResult, Test } from '../types';
 import {
   hasTestDataValidationErrors,
@@ -193,6 +201,27 @@ function validateCurrentSteps(steps: Step[]) {
   };
 }
 
+function humanizeStepAction(action: StepAction) {
+  const actionLabels: Record<StepAction, string> = {
+    goto: 'Navigate to URL',
+    click: 'Click element',
+    fill: 'Fill input',
+    press: 'Press key',
+    keyboardPress: 'Keyboard press',
+    selectOption: 'Select option',
+    assertVisible: 'Assert visible',
+    assertHidden: 'Assert hidden',
+    assertText: 'Assert text',
+    assertValue: 'Assert value',
+    assertURL: 'Assert URL',
+    assertTitle: 'Assert title',
+    assertChecked: 'Assert checked',
+    assertCount: 'Assert count',
+    waitForSelector: 'Wait for element'
+  };
+  return actionLabels[action] ?? action;
+}
+
 function formatStepIssueSummary(step: Step, index: number, issue: StepIssue) {
   const actionLabels: Record<Step['action'], string> = {
     goto: 'Navigate to URL',
@@ -247,6 +276,8 @@ export default function TestEditorPage() {
   const [stepIssues, setStepIssues] = useState<Array<StepIssue | undefined>>([]);
   const [firstInvalidStepIndex, setFirstInvalidStepIndex] = useState<number | null>(null);
   const [initialSnapshotReady, setInitialSnapshotReady] = useState(false);
+  const [selectedStepIndices, setSelectedStepIndices] = useState<Set<number>>(new Set());
+  const [showStepSelection, setShowStepSelection] = useState(false);
   const [useTestData, setUseTestData] = useState(false);
   const [editableTestData, setEditableTestData] = useState<EditableTestDataCase[]>([]);
   const [selectedDataCaseIndex, setSelectedDataCaseIndex] = useState<number | undefined>(undefined);
@@ -747,6 +778,10 @@ export default function TestEditorPage() {
     setRecordLoading(true);
     try {
       const data = await startRecording(
+        url, 
+        recordingProjectId || currentProjectId || projectId || '', 
+        selectedRecordingEnvironmentId || undefined, 
+        device,
         url,
         recordingProjectId || currentProjectId || projectId || '',
         selectedRecordingEnvironmentId || undefined,
@@ -1374,6 +1409,10 @@ export default function TestEditorPage() {
                     stepIssues={stepIssues}
                     validationResults={validationResults}
                     variableNames={environmentVariableNames}
+                    selectedStepIndices={selectedStepIndices}
+                    onSelectionChange={setSelectedStepIndices}
+                    showStepSelection={showStepSelection}
+                    onToggleSelection={setShowStepSelection}
                   />
                 ) : (
                   <Card style={{ borderRadius: 16, background: '#fafafa' }}>
@@ -1440,28 +1479,33 @@ export default function TestEditorPage() {
         onCancel={() => setRecordModalOpen(false)}
         confirmLoading={recordLoading}
       >
-        <Radio.Group
-          style={{ display: 'grid', gap: 12, width: '100%' }}
-          value={selectedRecordingEnvironmentId ?? ''}
-          onChange={(event) => setSelectedRecordingEnvironmentId(event.target.value || undefined)}
-        >
-          <Radio value="" disabled={recordingUrlHasTemplate}>
-            No environment (use values as-is)
-          </Radio>
-          {recordEnvironments.map((environment) => (
-            <Radio key={environment.id} value={environment.id}>
-              {environment.name}
-              <Text type="secondary" style={{ marginLeft: 8 }}>
-                {Object.keys(environment.variables).length} variables
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+          <div>
+            <Label style={{ display: 'block', marginBottom: 8 }}>Environment (if using variables)</Label>
+            <Radio.Group
+              style={{ display: 'grid', gap: 12, width: '100%' }}
+              value={selectedRecordingEnvironmentId ?? ''}
+              onChange={(event) => setSelectedRecordingEnvironmentId(event.target.value || undefined)}
+            >
+              <Radio value="" disabled={recordingUrlHasTemplate}>
+                No environment (use values as-is)
+              </Radio>
+              {recordEnvironments.map((environment) => (
+                <Radio key={environment.id} value={environment.id}>
+                  {environment.name}
+                  <Text type="secondary" style={{ marginLeft: 8 }}>
+                    {Object.keys(environment.variables).length} variables
+                  </Text>
+                </Radio>
+              ))}
+            </Radio.Group>
+            {recordEnvironments.length > 0 && (
+              <Text type="secondary" style={{ display: 'block', marginTop: 12 }}>
+                When Start URL contains {'{{VARIABLE}}'}, choose the environment that defines it.
               </Text>
-            </Radio>
-          ))}
-        </Radio.Group>
-        {recordEnvironments.length > 0 && (
-          <Text type="secondary" style={{ display: 'block', marginTop: 12 }}>
-            When Start URL contains {'{{VARIABLE}}'}, choose the environment that defines it.
-          </Text>
-        )}
+            )}
+          </div>
+        </div>
       </Modal>
 
       <Modal

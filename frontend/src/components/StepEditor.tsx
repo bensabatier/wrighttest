@@ -68,6 +68,10 @@ interface Props {
     expected?: string;
   } | undefined>;
   variableNames?: string[];
+  selectedStepIndices?: Set<number>;
+  onSelectionChange?: (indices: Set<number>) => void;
+  showStepSelection?: boolean;
+  onToggleSelection?: (show: boolean) => void;
 }
 
 const statusStyles: Record<StepValidationResult['status'], { backgroundColor?: string; border?: string }> = {
@@ -163,19 +167,65 @@ function humanizeStepAction(action: StepAction) {
 }
 
 function variableHint(value?: string) {
-  if (!value || !value.includes('{{')) return null;
+  if (!value) return null;
+  
+  const hasVariable = value.includes('{{');
+  const hasUuid = value.includes('{uuid}');
+  
+  if (!hasVariable && !hasUuid) return null;
+
+  const tooltipText = hasVariable && hasUuid 
+    ? 'Variables and UUID will be replaced at runtime' 
+    : hasVariable 
+    ? 'Variable will be replaced at runtime'
+    : 'UUID will be generated at runtime';
 
   return (
-    <Tooltip title="Variable will be replaced at runtime">
+    <Tooltip title={tooltipText}>
       <InfoCircleOutlined style={{ color: '#1677ff' }} />
     </Tooltip>
   );
 }
 
-export default function StepEditor({ steps, onChange, readOnly = false, validationResults, stepIssues = [], variableNames = [] }: Props) {
+export default function StepEditor({ 
+  steps, 
+  onChange, 
+  readOnly = false, 
+  validationResults, 
+  stepIssues = [], 
+  variableNames = [],
+  selectedStepIndices = new Set(),
+  onSelectionChange,
+  showStepSelection = false,
+  onToggleSelection
+}: Props) {
   const addStep = () => onChange([...steps, { action: 'goto', value: '' }]);
 
   const removeStep = (index: number) => onChange(steps.filter((_, idx) => idx !== index));
+  
+  const removeSteps = (indices: Set<number>) => {
+    onChange(steps.filter((_, idx) => !indices.has(idx)));
+    onSelectionChange?.(new Set());
+  };
+
+  const toggleStepSelection = (index: number) => {
+    const newSelection = new Set(selectedStepIndices);
+    if (newSelection.has(index)) {
+      newSelection.delete(index);
+    } else {
+      newSelection.add(index);
+    }
+    onSelectionChange?.(newSelection);
+  };
+
+  const selectAllSteps = () => {
+    const allIndices = new Set(steps.map((_, idx) => idx));
+    onSelectionChange?.(allIndices);
+  };
+
+  const deselectAllSteps = () => {
+    onSelectionChange?.(new Set());
+  };
 
   const duplicateStep = (index: number) => {
     const cloned = { ...steps[index] };
@@ -262,6 +312,13 @@ export default function StepEditor({ steps, onChange, readOnly = false, validati
             }
               title={
                 <Space size={8}>
+                  {showStepSelection && (
+                    <Checkbox
+                      checked={selectedStepIndices.has(index)}
+                      onChange={() => toggleStepSelection(index)}
+                      onClick={(e) => e.stopPropagation()}
+                    />
+                  )}
                   <HolderOutlined style={{ color: '#8c8c8c', cursor: 'grab' }} />
                 <span style={{ color: opt.group === 'Assertions' ? '#722ed1' : '#1677ff' }}>
                   {opt.icon}
@@ -335,27 +392,20 @@ export default function StepEditor({ steps, onChange, readOnly = false, validati
 
               {needsValue && (
                 <div style={{ flex: '1 1 320px', minWidth: 0, display: 'grid', gap: 4 }}>
-                  {step.action === 'fill' ? (
-                    <Input
-                      placeholder="Value"
-                      value={step.value ?? ''}
-                      style={{ width: '100%' }}
-                      disabled={readOnly}
-                      status={fieldIssue?.value ? 'error' : undefined}
-                      onChange={(event) => updateStep(index, { value: event.target.value })}
-                      onInput={(event) => updateStep(index, { value: event.currentTarget.value })}
-                    />
-                  ) : (
-                    <VariableAutocompleteInput
-                      placeholder={step.action === 'goto' ? 'https://example.com' : 'Value'}
-                      value={step.value ?? ''}
-                      style={{ width: '100%' }}
-                      disabled={readOnly}
-                      status={fieldIssue?.value ? 'error' : undefined}
-                      suffix={variableHint(step.value)}
-                      variableNames={variableNames}
-                      onValueChange={(nextValue) => updateStep(index, { value: nextValue })}
-                    />
+                  <VariableAutocompleteInput
+                    placeholder={step.action === 'goto' ? 'https://example.com' : step.action === 'fill' ? 'e.g., Text-{uuid}' : 'Value'}
+                    value={step.value ?? ''}
+                    style={{ width: '100%' }}
+                    disabled={readOnly}
+                    status={fieldIssue?.value ? 'error' : undefined}
+                    suffix={variableHint(step.value)}
+                    variableNames={variableNames}
+                    onValueChange={(nextValue) => updateStep(index, { value: nextValue })}
+                  />
+                  {step.action === 'fill' && (
+                    <Text type="secondary" style={{ fontSize: 12, lineHeight: 1.3, minHeight: 32, display: 'block' }}>
+                      Use <code style={{ background: '#f0f0f0', padding: '2px 4px', borderRadius: 2 }}>{'{uuid}'}</code> to generate a unique ID on each run.
+                    </Text>
                   )}
                   {fieldIssue?.value ? (
                     <Text type="danger" style={{ fontSize: 12, lineHeight: 1.4 }}>
@@ -428,9 +478,55 @@ export default function StepEditor({ steps, onChange, readOnly = false, validati
           </Card>
         );
       })}
-      <Button icon={<PlusOutlined />} onClick={addStep} type="dashed" block disabled={readOnly}>
-        Add step
-      </Button>
+      {showStepSelection && selectedStepIndices.size > 0 && (
+        <Card
+          size="small"
+          style={{
+            borderRadius: 16,
+            backgroundColor: '#fafafa',
+            borderLeft: '3px solid #1677ff'
+          }}
+        >
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <Space>
+              <Text>
+                {selectedStepIndices.size} step{selectedStepIndices.size !== 1 ? 's' : ''} selected
+              </Text>
+              <Button size="small" type="text" onClick={selectAllSteps}>
+                Select all
+              </Button>
+              <Button size="small" type="text" onClick={deselectAllSteps}>
+                Deselect all
+              </Button>
+            </Space>
+            <Button
+              danger
+              onClick={() => removeSteps(selectedStepIndices)}
+              disabled={readOnly}
+            >
+              Delete selected
+            </Button>
+          </div>
+        </Card>
+      )}
+      <Space style={{ width: '100%' }}>
+        <Button icon={<PlusOutlined />} onClick={addStep} type="dashed" block disabled={readOnly}>
+          Add step
+        </Button>
+        {!showStepSelection && steps.length > 0 && (
+          <Button type="text" onClick={() => onToggleSelection?.(true)} style={{ width: 'auto' }} disabled={readOnly}>
+            Select steps for deletion
+          </Button>
+        )}
+        {showStepSelection && (
+          <Button type="text" onClick={() => {
+            onToggleSelection?.(false);
+            onSelectionChange?.(new Set());
+          }} style={{ width: 'auto' }} disabled={readOnly}>
+            Cancel selection
+          </Button>
+        )}
+      </Space>
     </div>
   );
 }

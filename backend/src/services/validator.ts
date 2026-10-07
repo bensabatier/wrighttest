@@ -102,7 +102,7 @@ export async function validateSteps(
     }
 
     for (const [index, step] of steps.entries()) {
-      const normalizedStep = interpolateStep(step, {});
+      const normalizedStep = interpolateStep(step, {}, crypto.randomUUID());
 
       const requirementIssue = validateStepRequirements(step);
       if (requirementIssue) {

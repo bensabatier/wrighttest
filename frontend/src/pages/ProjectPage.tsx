@@ -1957,6 +1957,9 @@ export default function ProjectPage() {
                     setActiveTab(nextTab);
                   }}
                 />
+                <Button size="medium" onClick={() => navigate(`/projects/${projectId}/suites`)}>
+                  Suites
+                </Button>
               </div>
             </Card>
           </Col>
@@ -2304,9 +2307,9 @@ export default function ProjectPage() {
                           )
                       },
                       {
-                        title: 'Open',
+                        title: 'Open Run',
                         render: (_: unknown, row: ProjectCheck) => (
-                          <Button size="small" onClick={() => openCheck(row.id)}>
+                          <Button size="small" onClick={() => navigate(`/runs/${row.latestRun?.id}`)}>
                             Open
                           </Button>
                         )
@@ -3279,7 +3282,6 @@ export default function ProjectPage() {
         confirmLoading={runningSuite}
         okButtonProps={{ disabled: suites.length === 0 }}
       >
-        {suites.length === 0 ? (
           <Empty
             image={Empty.PRESENTED_IMAGE_SIMPLE}
             description={
@@ -3293,7 +3295,6 @@ export default function ProjectPage() {
               Create suite
             </Button>
           </Empty>
-        ) : (
           <Space direction="vertical" style={{ width: '100%' }} size={16}>
             <div>
               <Text type="secondary">Suite</Text>
@@ -3326,7 +3327,7 @@ export default function ProjectPage() {
               </Radio.Group>
             </div>
           </Space>
-        )}
+        
       </Modal>
 
       <Modal
